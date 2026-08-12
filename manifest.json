@@ -1,0 +1,17 @@
+{
+  "name": "Shubham Hexor",
+  "short_name": "Shubham Hexor",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#eef2f7",
+  "theme_color": "#0b1220",
+  "description": "e-Dispatch Office Finder",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<meta name="description" content="Shubham Hexor e-Dispatch Office Finder">
+<link rel="manifest" href="manifest.json">
+<title>Shubham Hexor</title>
+<style>
+:root{--bg:#eef2f7;--card:#fff;--ink:#111827;--muted:#667085;--accent:#2563eb;--line:#e5e7eb}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#0b1220 0 220px,var(--bg) 220px);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink)}
+.app{max-width:720px;margin:auto;padding:18px}.hero{color:#fff;padding:18px 4px 28px}.brand{font-size:29px;font-weight:800;letter-spacing:-.5px}.tag{opacity:.75;font-size:13px;margin-top:3px}
+.card{background:var(--card);border-radius:20px;padding:16px;margin:12px 0;box-shadow:0 8px 30px #11182712}.title{font-size:17px;font-weight:750}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+button,.pick{border:0;border-radius:13px;padding:13px 12px;font-weight:750;font-size:15px;text-align:center;cursor:pointer}
+.primary{background:var(--accent);color:white}.secondary{background:#e9eef6;color:var(--ink)}
+input[type=file]{display:none}.preview{width:100%;max-height:360px;object-fit:contain;border-radius:15px;margin-top:12px;display:none;background:#f1f5f9}
+.status{font-size:13px;color:var(--muted);margin-top:10px}.bar{height:7px;background:#e5e7eb;border-radius:8px;overflow:hidden;margin-top:10px;display:none}.fill{height:100%;width:0;background:var(--accent)}
+.search{width:100%;padding:13px;border:1px solid #d6dae1;border-radius:12px;font-size:16px;margin-top:10px}
+.result{border:1px solid var(--line);border-radius:14px;padding:13px;margin-top:9px}.result strong{display:block}.small{font-size:12px;color:var(--muted);margin-top:4px}
+.hide{display:none}.copy{margin-top:9px;padding:9px 11px;font-size:13px;background:#eef2ff;color:#1d4ed8;border-radius:10px;border:0;font-weight:700}
+footer{text-align:center;color:#8b95a5;font-size:12px;padding:15px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="hero"><div class="brand">Shubham Hexor</div><div class="tag">e-Dispatch Office Finder</div></header>
+
+  <section class="card">
+    <div class="title">📷 Letter ka first page</div>
+    <div class="actions">
+      <label class="pick primary" for="camera">📸 Camera</label>
+      <label class="pick secondary" for="gallery">🖼️ Gallery</label>
+      <input id="camera" type="file" accept="image/*" capture="environment">
+      <input id="gallery" type="file" accept="image/*">
+    </div>
+    <img id="preview" class="preview">
+    <div id="status" class="status">Photo upload karo. App “प्रति / प्रतिलिपि” wale text ko read karke office suggest karega.</div>
+    <div id="bar" class="bar"><div id="fill" class="fill"></div></div>
+  </section>
+
+  <section class="card">
+    <div class="title">🔎 Manual Office Search</div>
+    <input id="manual" class="search" placeholder="Office ka naam/type karo…">
+    <div id="manualResults"></div>
+  </section>
+
+  <section class="card">
+    <div class="title">🏢 Suggested Offices</div>
+    <div id="results" class="status">Abhi koi result nahi.</div>
+  </section>
+
+  <footer>Shubham Hexor • Office master list: 540 entries</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+let OFFICES=[];
+const $=id=>document.getElementById(id);
+fetch('data/offices.json').then(r=>r.json()).then(x=>OFFICES=x);
+
+function norm(s){
+ return (s||'').toLowerCase()
+   .replace(/[०-९]/g,'')
+   .replace(/[\u0900-\u097f]/g,' ')
+   .replace(/[^a-z0-9]+/g,' ')
+   .replace(/\s+/g,' ').trim();
+}
+const aliases={
+ 'मुख्य वन संरक्षक':'pccf','वन्यप्राणी':'wildlife','वन्यजीव':'wildlife',
+ 'नवा रायपुर':'naya raipur','नया रायपुर':'naya raipur',
+ 'बिलासपुर':'bilaspur','दुर्ग':'durg','रायपुर':'raipur','जगदलपुर':'jagdalpur',
+ 'कांकेर':'kanker','धमतरी':'dhamtari','गरियाबंद':'gariyaband',
+ 'धरमजयगढ़':'dharamjaigarh','नारायणपुर':'narayanpur','दंतेवाड़ा':'dantewada',
+ 'सुकमा':'sukma','कवर्धा':'kawardha','बालोद':'balod','कोरबा':'korba',
+ 'सरगुजा':'surguja','सूरजपुर':'surajpur','राजनांदगांव':'rajnandgaon'
+};
+function expanded(text){
+ let t=text.toLowerCase();
+ for(const [a,b] of Object.entries(aliases)) if(t.includes(a)) t+=' '+b;
+ return t;
+}
+function score(text, office){
+ const q=expanded(text), o=norm(office);
+ let score=0;
+ const qwords=[...new Set(norm(q).split(' ').filter(w=>w.length>2))];
+ const owords=new Set(o.split(' '));
+ for(const w of qwords) if(owords.has(w)) score += w.length>=7?8:4;
+ if(q.includes('wildlife') && (o.includes('wild life')||o.includes('wildlife')||o.includes('वन्य'))) score+=18;
+ if(q.includes('pccf') && o.includes('pccf')) score+=14;
+ if(q.includes('naya raipur') && o.includes('naya raipur')) score+=12;
+ if(q.includes('bilaspur') && o.includes('bilaspur')) score+=12;
+ if(q.includes('durg') && o.includes('durg')) score+=12;
+ return score;
+}
+function search(text,limit=8){
+ return OFFICES.map(o=>({office:o,score:score(text,o)}))
+   .filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,limit);
+}
+function render(list,target){
+ target.innerHTML='';
+ if(!list.length){target.innerHTML='<div class="status">Matching office nahi mila.</div>';return;}
+ list.forEach((x,i)=>{
+   const d=document.createElement('div'); d.className='result';
+   d.innerHTML=`<strong>${i+1}. ${escapeHtml(x.office)}</strong>
+   <div class="small">Match score: ${x.score}</div>
+   <button class="copy" data-copy="${escapeAttr(x.office)}">📋 Copy office name</button>`;
+   target.appendChild(d);
+ });
+ target.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{
+   navigator.clipboard?.writeText(b.dataset.copy); b.textContent='✓ Copied';
+ });
+}
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function escapeAttr(s){return s.replace(/"/g,'&quot;');}
+
+$('manual').addEventListener('input',e=>render(search(e.target.value,8),$('manualResults')));
+
+async function ocr(file){
+ $('preview').src=URL.createObjectURL(file); $('preview').style.display='block';
+ $('bar').style.display='block'; $('fill').style.width='0%';
+ $('status').textContent='Photo read ho rahi hai…';
+ const out=await Tesseract.recognize(file,'eng+hin',{
+   logger:m=>{if(m.progress) $('fill').style.width=(m.progress*100)+'%';}
+ });
+ $('bar').style.display='none';
+ const text=out.data.text||'';
+ $('status').textContent='Letter read ho gaya. Best matching office neeche hai.';
+ render(search(text,10),$('results'));
+}
+['camera','gallery'].forEach(id=>$(id).addEventListener('change',async e=>{
+ const f=e.target.files?.[0]; if(!f)return;
+ try{await ocr(f);}catch(err){$('status').textContent='OCR error. Clear photo lekar dobara try karo.';}
+}));
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
