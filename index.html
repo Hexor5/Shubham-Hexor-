@@ -58,7 +58,7 @@ footer{text-align:center;color:#8b95a5;font-size:12px;padding:15px}
 <script>
 let OFFICES=[];
 const $=id=>document.getElementById(id);
-fetch('data/offices.json').then(r=>r.json()).then(x=>OFFICES=x);
+fetch('offices.json').then(r=>r.json()).then(x=>OFFICES=x);
 
 function norm(s){
  return (s||'').toLowerCase()
